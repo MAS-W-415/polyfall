@@ -30,7 +30,6 @@ let state = null;
 let pollBusy = false;
 let startVisible = true;
 let settingsApplied = false;
-let audioCtx = null;
 let levelsBuilt = false;
 let lastLevel = 1;
 let flash = null;          // {rows, until}
@@ -38,26 +37,86 @@ let lockFlash = null;      // {cells, until}
 let prevBoard = null;
 
 // ---------------------------------------------------------------- sound
-function beep(freq, dur, gain = 0.04) {
-  if (!soundOn) return;
-  try {
-    audioCtx = audioCtx || new (window.AudioContext || window.webkitAudioContext)();
-    const osc = audioCtx.createOscillator();
-    const g = audioCtx.createGain();
-    osc.type = T.themeParams(themeKey).sound || "square";
-    osc.frequency.value = freq;
-    g.gain.value = gain;
+const audio = {
+  ctx: null,
+  master: null,
+  filter: null,
+  volume: store.get("polyfall_volume", 50),
+  ensure() {
+    if (this.ctx) {
+      if (this.ctx.state === "suspended") this.ctx.resume();
+      return;
+    }
+    const Ctx = window.AudioContext || window.webkitAudioContext;
+    if (!Ctx) return;
+    this.ctx = new Ctx();
+    this.filter = this.ctx.createBiquadFilter();
+    this.filter.type = "lowpass";
+    this.filter.frequency.value = 2400;
+    const comp = this.ctx.createDynamicsCompressor();
+    this.master = this.ctx.createGain();
+    this.master.gain.value = (this.volume / 100) * 0.9;
+    this.filter.connect(comp);
+    comp.connect(this.master);
+    this.master.connect(this.ctx.destination);
+  },
+  setVolume(value) {
+    this.volume = value;
+    store.set("polyfall_volume", value);
+    if (this.master) this.master.gain.value = (value / 100) * 0.9;
+  },
+  tone(freq, options = {}) {
+    if (!soundOn || this.volume <= 0) return;
+    this.ensure();
+    if (!this.ctx) return;
+    const { to = null, dur = 0.11, gain = 0.15, delay = 0,
+            wave = null, attack = 0.014 } = options;
+    const t0 = this.ctx.currentTime + delay;
+    const osc = this.ctx.createOscillator();
+    osc.type = wave || T.themeParams(themeKey).sound || "triangle";
+    osc.frequency.setValueAtTime(freq, t0);
+    if (to) osc.frequency.exponentialRampToValueAtTime(to, t0 + dur);
+    const g = this.ctx.createGain();
+    g.gain.setValueAtTime(0.0001, t0);
+    g.gain.exponentialRampToValueAtTime(gain, t0 + attack);
+    g.gain.exponentialRampToValueAtTime(0.0001, t0 + dur);
     osc.connect(g);
-    g.connect(audioCtx.destination);
-    osc.start();
-    g.gain.exponentialRampToValueAtTime(0.0001, audioCtx.currentTime + dur);
-    osc.stop(audioCtx.currentTime + dur);
-  } catch (err) { /* ignore */ }
+    g.connect(this.filter);
+    osc.start(t0);
+    osc.stop(t0 + dur + 0.03);
+  },
+  seq(notes, step = 0.06, gain = 0.13) {
+    notes.forEach((freq, i) => this.tone(freq, {
+      dur: step * 1.5, gain, delay: i * step,
+    }));
+  },
+};
+
+const SOUNDS = {
+  move: () => audio.tone(300, { dur: 0.045, gain: 0.06 }),
+  rotate: () => audio.tone(380, { to: 520, dur: 0.06, gain: 0.08 }),
+  soft: () => audio.tone(220, { dur: 0.03, gain: 0.04 }),
+  hard: () => audio.tone(190, { to: 95, dur: 0.09, gain: 0.12 }),
+  lock: () => audio.tone(150, { to: 100, dur: 0.07, gain: 0.10 }),
+  hold: () => {
+    audio.tone(440, { dur: 0.06, gain: 0.09 });
+    audio.tone(660, { dur: 0.08, gain: 0.09, delay: 0.06 });
+  },
+  clear1: () => audio.seq([523, 659, 784]),
+  clear2: () => audio.seq([523, 659, 784, 1047]),
+  clear3: () => audio.seq([523, 659, 784, 988, 1175]),
+  clear4: () => audio.seq([523, 659, 784, 1047, 1319, 1568]),
+  level: () => audio.seq([523, 659, 784, 1047], 0.09, 0.12),
+  over: () => audio.seq([392, 330, 262, 196], 0.17, 0.11),
+};
+
+function playSound(name) {
+  const fn = SOUNDS[name];
+  if (fn) fn();
 }
 
-document.addEventListener("pointerdown", () => {
-  if (audioCtx && audioCtx.state === "suspended") audioCtx.resume();
-}, { once: true });
+document.addEventListener("pointerdown", () => audio.ensure(), { once: true });
+document.addEventListener("keydown", () => audio.ensure(), { once: true });
 
 // ---------------------------------------------------------------- helpers
 function post(cmd) {
@@ -207,17 +266,7 @@ function drawSlots(state) {
   } else {
     heldCanvas.getContext("2d").clearRect(0, 0, heldCanvas.width, heldCanvas.height);
   }
-  const c = nextCanvas.getContext("2d");
-  if (state.preview_hidden) {
-    c.clearRect(0, 0, nextCanvas.width, nextCanvas.height);
-    c.fillStyle = getComputedStyle(document.body).getPropertyValue("--muted") || "#888";
-    c.font = "26px sans-serif";
-    c.textAlign = "center";
-    c.textBaseline = "middle";
-    c.fillText("?", nextCanvas.width / 2, nextCanvas.height / 2);
-  } else {
-    drawMini(nextCanvas, state.shapes[state.queue[0]], palette[state.queue[0]]);
-  }
+  drawMini(nextCanvas, state.shapes[state.queue[0]], palette[state.queue[0]]);
 }
 
 // ---------------------------------------------------------------- HUD
@@ -239,7 +288,7 @@ function updateHud(state) {
 
   if (state.level > lastLevel) {
     toast(`LEVEL ${state.level}`);
-    beep(660, 0.12, 0.05);
+    playSound("level");
   }
   lastLevel = state.level;
 }
@@ -254,18 +303,18 @@ function detectEvents(state) {
   }
   if (locked.length && locked.length <= 20) {
     lockFlash = { cells: locked, until: performance.now() + 160 };
-    beep(110, 0.06, 0.04);
+    playSound("lock");
   }
   const clear = state.last_clear || { rows: [], seq: 0 };
   if (clear.seq !== (detectEvents.seq || 0)) {
     detectEvents.seq = clear.seq;
     if (clear.rows.length) {
       flash = { rows: clear.rows, until: performance.now() + 250 };
-      beep(880, 0.1, 0.05);
-      setTimeout(() => beep(1320, 0.1, 0.04), 60);
+      const n = Math.min(4, Math.max(1, clear.rows.length));
+      playSound(`clear${n}`);
     }
   }
-  if (state.game_over && !detectEvents.over) beep(200, 0.5, 0.05);
+  if (state.game_over && !detectEvents.over) playSound("over");
   detectEvents.over = state.game_over;
   prevBoard = state.board.map(row => row.slice());
 }
@@ -330,6 +379,7 @@ function syncStartControls(state) {
   updateLevelButtons(state);
   document.getElementById("speed-toggle").checked = state.speed_mode === "progressive";
   document.getElementById("sound-toggle").checked = soundOn;
+  document.getElementById("volume").value = String(audio.volume);
 }
 
 function applyStoredSettings(state) {
@@ -403,10 +453,17 @@ document.addEventListener("keydown", (event) => {
   if (event.key === "p" || event.key === "P") { post({ cmd: "pause" }); return; }
   if (event.key === "r" || event.key === "R") { post({ cmd: "restart" }); return; }
   if (event.key === "a" || event.key === "A") { cycleAssist(); return; }
+  if (state && state.paused) return;
   const mapping = keyToCmd(event.key);
   if (!mapping) return;
   event.preventDefault();
   if (event.repeat) return;
+  const sound = mapping.cmd === "left" || mapping.cmd === "right" ? "move"
+    : mapping.cmd === "down" ? "soft"
+      : mapping.cmd === "hard_drop" ? "hard"
+        : mapping.cmd === "hold" ? "hold"
+          : "rotate";
+  playSound(sound);
   post({ cmd: mapping.cmd, cw: mapping.cw });
 });
 
@@ -426,15 +483,19 @@ function touchCommand(button) {
 for (const button of document.querySelectorAll("#touch button")) {
   button.addEventListener("pointerdown", (event) => {
     event.preventDefault();
-    if (startVisible) return;
+    if (startVisible || (state && state.paused)) return;
     const command = touchCommand(button);
     post(command);
-    const mapping = keyToCmd(button.dataset.cmd === "rotcw" ? "ArrowUp" : "");
     const holdKey = command.cmd === "left" ? "left"
       : command.cmd === "right" ? "right"
         : command.cmd === "down" ? "down" : null;
     if (holdKey) button.dataset.held = holdKey;
-    beep(320, 0.03, 0.02);
+    const sound = command.cmd === "left" || command.cmd === "right" ? "move"
+      : command.cmd === "down" ? "soft"
+        : command.cmd === "hard_drop" ? "hard"
+          : command.cmd === "hold" ? "hold"
+            : "rotate";
+    playSound(sound);
   });
   const release = () => {
     if (button.dataset.held) {
@@ -470,6 +531,10 @@ document.getElementById("speed-toggle").addEventListener("change", (event) => {
 document.getElementById("sound-toggle").addEventListener("change", (event) => {
   soundOn = event.target.checked;
   store.set("polyfall_sound", soundOn);
+});
+
+document.getElementById("volume").addEventListener("input", (event) => {
+  audio.setVolume(Number(event.target.value));
 });
 
 document.getElementById("btn-sound").addEventListener("click", () => {

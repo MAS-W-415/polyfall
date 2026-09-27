@@ -76,6 +76,7 @@ class Game:
 
         threading.Thread(target=self._hint_worker, daemon=True).start()
         self._refresh_panel()
+        self._decide_next_piece()
         self._begin_piece()
 
     # ------------------------------------------------------------- scoring
@@ -85,21 +86,33 @@ class Game:
 
     def _on_lock(self, engine):
         self._hardest, self._scores = hardest_fast(engine.board)
-        if self.difficulty > 0 and self._hardest is not None:
-            roll = float(self.rng.random())
-            injected = roll < self.difficulty
-            pick = None
-            if injected:
-                pick = sample_hardest(self._scores, k=self.sampler_k,
-                                      temp=self.sampler_temp, rng=self.rng)
-                if pick is not None:
-                    engine.set_next_piece(pick)
-            self.sampling_log.appendleft({
-                "piece": engine.piece_idx,
-                "roll": round(roll, 3),
-                "injected": injected,
-                "picked": pick,
-            })
+
+    # ------------------------------------------------------- difficulty
+    def _decide_next_piece(self):
+        """Roll the difficulty dice once per piece and possibly replace queue[0].
+
+        Runs when a new piece spawns, so the preview always shows the real next
+        piece (the board is constant while the current piece falls).
+        """
+        engine = self.engine
+        if engine.piece_idx is None:
+            return
+        if self.difficulty <= 0 or self._hardest is None:
+            return
+        roll = float(self.rng.random())
+        injected = roll < self.difficulty
+        pick = None
+        if injected:
+            pick = sample_hardest(self._scores, k=self.sampler_k,
+                                  temp=self.sampler_temp, rng=self.rng)
+            if pick is not None:
+                engine.set_next_piece(pick)
+        self.sampling_log.appendleft({
+            "piece": engine.piece_idx,
+            "roll": round(roll, 3),
+            "injected": injected,
+            "picked": pick,
+        })
 
     # --------------------------------------------------------------- hints
     def _hint_payload(self, piece, placement, precise):
@@ -165,11 +178,17 @@ class Game:
             action = cmd.get("cmd")
             if self.public and action in ("player", "sampler", "speed"):
                 return
+            gameplay = ("left", "right", "down", "release", "rotate",
+                        "hard_drop", "hold")
+            if self.paused and action in gameplay:
+                return
             if action == "restart":
                 self._restart()
             elif action == "pause":
                 value = cmd.get("value")
                 self.paused = bool(value) if value is not None else not self.paused
+                if self.paused:
+                    self._held.clear()
             elif action == "speed_mode":
                 self.speed_mode = str(cmd.get("value", "progressive"))
             elif action == "player":
@@ -186,6 +205,7 @@ class Game:
             elif action == "difficulty":
                 value = float(cmd.get("value", 0.0))
                 self.difficulty = min(1.0, max(0.0, value))
+                self._decide_next_piece()
             elif action == "sampler":
                 if "k" in cmd:
                     self.sampler_k = max(1, int(cmd["k"]))
@@ -228,6 +248,7 @@ class Game:
             engine = self.engine
             if engine.piece_seq != self._seen_seq:
                 self._seen_seq = engine.piece_seq
+                self._decide_next_piece()
                 self._begin_piece()
             if self.paused or engine.game_over or engine.piece_idx is None:
                 return
@@ -308,7 +329,6 @@ class Game:
                     "target": self._hint_target,
                 },
                 "difficulty": self.difficulty,
-                "preview_hidden": self.difficulty > 0,
                 "level": self.level(),
                 "gravity": round(self.gravity(), 3),
                 "speed_mode": self.speed_mode,

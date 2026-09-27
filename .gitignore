@@ -5,3 +5,8 @@ __pycache__/
 dist/
 build/
 *.egg-info/
+checkpoints/
+train/*.log
+train/bench_*.json
+train/tune_history.json
+tuned_weights.npz
