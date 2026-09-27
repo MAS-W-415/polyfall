@@ -8,9 +8,12 @@ const nextCanvas = document.getElementById("next");
 
 // ---------------------------------------------------------------- themes
 const T = window.TetrisTheme;
+const music = window.TetrisMusic;
 const store = T.store;
 let themeKey = T.currentTheme();
 let soundOn = store.get("polyfall_sound", true);
+let musicOn = store.get("polyfall_music", true);
+let musicVolume = store.get("polyfall_music_volume", 35);
 let palette = [];
 let serverPalette = null;
 
@@ -21,6 +24,7 @@ function buildPalette() {
 function applyTheme(key) {
   themeKey = key;
   T.applyTheme(key);
+  music.setTheme(key);
   buildPalette();
   buildThemeButtons();
 }
@@ -115,8 +119,30 @@ function playSound(name) {
   if (fn) fn();
 }
 
-document.addEventListener("pointerdown", () => audio.ensure(), { once: true });
-document.addEventListener("keydown", () => audio.ensure(), { once: true });
+document.addEventListener("pointerdown", () => {
+  audio.ensure();
+  music.attach(audio.ctx);
+  music.setVolume(musicVolume);
+  music.setTheme(themeKey);
+}, { once: true });
+document.addEventListener("keydown", () => {
+  audio.ensure();
+  music.attach(audio.ctx);
+  music.setVolume(musicVolume);
+  music.setTheme(themeKey);
+}, { once: true });
+
+function musicShouldPlay() {
+  return musicOn && musicVolume > 0 && state && !state.paused
+    && !state.game_over && !startVisible && !document.hidden;
+}
+
+function syncMusic() {
+  if (musicShouldPlay()) music.start();
+  else music.stop();
+}
+
+document.addEventListener("visibilitychange", syncMusic);
 
 // ---------------------------------------------------------------- helpers
 function post(cmd) {
@@ -291,6 +317,7 @@ function updateHud(state) {
     playSound("level");
   }
   lastLevel = state.level;
+  music.setIntensity(state.level);
 }
 
 function detectEvents(state) {
@@ -380,6 +407,8 @@ function syncStartControls(state) {
   document.getElementById("speed-toggle").checked = state.speed_mode === "progressive";
   document.getElementById("sound-toggle").checked = soundOn;
   document.getElementById("volume").value = String(audio.volume);
+  document.getElementById("music-toggle").checked = musicOn;
+  document.getElementById("music-volume").value = String(musicVolume);
 }
 
 function applyStoredSettings(state) {
@@ -414,6 +443,7 @@ async function poll() {
     updateOverlays(data);
     detectEvents(data);
     if (startVisible) syncStartControls(data);
+    syncMusic();
   } catch (err) { /* server restarting */ }
   pollBusy = false;
 }
@@ -535,6 +565,19 @@ document.getElementById("sound-toggle").addEventListener("change", (event) => {
 
 document.getElementById("volume").addEventListener("input", (event) => {
   audio.setVolume(Number(event.target.value));
+});
+
+document.getElementById("music-toggle").addEventListener("change", (event) => {
+  musicOn = event.target.checked;
+  store.set("polyfall_music", musicOn);
+  syncMusic();
+});
+
+document.getElementById("music-volume").addEventListener("input", (event) => {
+  musicVolume = Number(event.target.value);
+  store.set("polyfall_music_volume", musicVolume);
+  music.setVolume(musicVolume);
+  syncMusic();
 });
 
 document.getElementById("btn-sound").addEventListener("click", () => {

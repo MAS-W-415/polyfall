@@ -388,6 +388,7 @@ class Handler(BaseHTTPRequestHandler):
             "/game.js": ("game.js", "text/javascript; charset=utf-8"),
             "/observer.js": ("observer.js", "text/javascript; charset=utf-8"),
             "/theme.js": ("theme.js", "text/javascript; charset=utf-8"),
+            "/music.js": ("music.js", "text/javascript; charset=utf-8"),
             "/style.css": ("style.css", "text/css; charset=utf-8"),
             "/themes.css": ("themes.css", "text/css; charset=utf-8"),
         }
