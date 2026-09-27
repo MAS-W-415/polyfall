@@ -1,0 +1,85 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Polyfall</title>
+  <link rel="stylesheet" href="./style.css">
+  <link rel="stylesheet" href="./themes.css">
+</head>
+<body data-theme="dark">
+  <div id="game-app">
+    <header class="hud">
+      <div class="hud-item">分数 <b id="hud-score">0</b></div>
+      <div class="hud-item">消行 <b id="hud-lines">0</b></div>
+      <div class="hud-item">等级 <b id="hud-level">1</b></div>
+      <div class="hud-item">最高 <b id="hud-best">0</b></div>
+      <div class="hud-item" id="hud-assist">辅助 关</div>
+      <button id="btn-sound" class="icon-btn" title="音效">🔊</button>
+      <button id="btn-pause" class="ghost-btn">暂停</button>
+    </header>
+    <main class="play">
+      <canvas id="board" width="280" height="560"></canvas>
+      <aside class="side">
+        <div class="slot"><span>暂存</span><canvas id="held" width="64" height="64"></canvas></div>
+        <div class="slot"><span>下一块</span><canvas id="next" width="64" height="64"></canvas></div>
+        <div id="touch">
+          <button data-cmd="left">←</button>
+          <button data-cmd="right">→</button>
+          <button data-cmd="rotcw">↻</button>
+          <button data-cmd="rotccw">↺</button>
+          <button data-cmd="down">↓</button>
+          <button data-cmd="hard_drop">⤓</button>
+          <button data-cmd="hold">C</button>
+        </div>
+      </aside>
+    </main>
+    <footer id="help">← → 移动 · ↑/X 顺旋 · Z 逆旋 · ↓ 软降 · 空格 硬降 · C 暂存 · A 辅助 · P 暂停 · R 重开</footer>
+  </div>
+
+  <div id="start" class="overlay">
+    <div class="panel">
+      <h1>Polyfall</h1>
+      <label class="field">难度
+        <input id="difficulty" type="range" min="0" max="100" value="0">
+        <span id="difficulty-label">0%</span>
+      </label>
+      <div class="field">AI 辅助
+        <label class="switch"><input type="checkbox" id="assist-enabled"> 开启</label>
+        <div id="assist-levels" class="levels"></div>
+      </div>
+      <div class="field">风格
+        <div id="themes" class="themes"></div>
+      </div>
+      <div class="field">选项
+        <label class="switch"><input type="checkbox" id="speed-toggle" checked> 等级加速</label>
+        <label class="switch"><input type="checkbox" id="sound-toggle" checked> 音效</label>
+      </div>
+      <div class="actions">
+        <button id="btn-start" class="primary">开始游戏</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="pause-menu" class="overlay hidden">
+    <div class="panel small">
+      <h2>已暂停</h2>
+      <button id="btn-resume" class="primary">继续</button>
+      <button id="btn-restart-pause" class="ghost-btn">重开</button>
+      <button id="btn-title" class="ghost-btn">返回标题</button>
+    </div>
+  </div>
+
+  <div id="gameover" class="overlay hidden">
+    <div class="panel small">
+      <h2>游戏结束</h2>
+      <p id="go-stats"></p>
+      <button id="btn-again" class="primary">再来一局</button>
+      <button id="btn-title2" class="ghost-btn">返回标题</button>
+    </div>
+  </div>
+
+  <script src="./theme.js"></script>
+  <script src="./game.js"></script>
+</body>
+</html>

@@ -1,0 +1,54 @@
+/* Seven selectable themes. Each theme styles the chrome; the board colours
+   and rendering details live in game.js (THEMES). */
+
+body[data-theme="dark"] {
+  --bg: #0f1219; --panel: #1a1f2b; --line: #2a3142;
+  --text: #e8ecf4; --muted: #8b93a7; --accent: #4cc9f0;
+  --board-bg: #0b0e14; --radius: 8px;
+}
+
+body[data-theme="pixel"] {
+  --bg: #10190f; --panel: #16240f; --line: #2f4a1e;
+  --text: #d8f0c0; --muted: #86a86a; --accent: #9ee049;
+  --board-bg: #0b1208; --radius: 2px;
+  font-family: "Courier New", monospace;
+}
+body[data-theme="pixel"] .overlay .panel { border-width: 3px; }
+body[data-theme="pixel"] .piece { border-radius: 0; }
+
+body[data-theme="neon"] {
+  --bg: #0d0716; --panel: #170e26; --line: #3b2060;
+  --text: #f3e9ff; --muted: #a78bce; --accent: #ff4ecd;
+  --board-bg: #090411; --radius: 6px;
+}
+body[data-theme="neon"] .primary,
+body[data-theme="neon"] .piece.hardest {
+  box-shadow: 0 0 14px color-mix(in srgb, var(--accent) 65%, transparent);
+}
+
+body[data-theme="paper"] {
+  --bg: #f5f1e6; --panel: #fffdf7; --line: #d8cfba;
+  --text: #2b2620; --muted: #7c7264; --accent: #b4652a;
+  --board-bg: #fffdf7; --good: #3e8e5a; --danger: #b23a2f;
+}
+
+body[data-theme="ocean"] {
+  --bg: #061a26; --panel: #0b2b3d; --line: #14506b;
+  --text: #d8f4ff; --muted: #6fa8c0; --accent: #39c0d6;
+  --board-bg: #04121c;
+}
+body[data-theme="ocean"] .primary { box-shadow: 0 0 12px rgba(57, 192, 214, 0.45); }
+
+body[data-theme="sakura"] {
+  --bg: #fff0f5; --panel: #fff8fb; --line: #f0cddc;
+  --text: #5a4550; --muted: #a6808f; --accent: #e56a9a;
+  --board-bg: #fffafc; --danger: #d05570; --good: #5aa47a;
+}
+
+body[data-theme="terminal"] {
+  --bg: #020803; --panel: #04120a; --line: #0d3d1a;
+  --text: #9dffb8; --muted: #4fbf74; --accent: #37ff6b;
+  --board-bg: #010502; --radius: 0;
+  font-family: "Courier New", monospace;
+}
+body[data-theme="terminal"] .primary { box-shadow: 0 0 10px rgba(55, 255, 107, 0.5); }
