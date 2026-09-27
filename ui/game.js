@@ -411,15 +411,30 @@ function syncStartControls(state) {
   document.getElementById("music-volume").value = String(musicVolume);
 }
 
+const urlParams = new URLSearchParams(location.search);
+const urlTheme = urlParams.get("theme");
+const urlAssist = urlParams.get("assist");
+const urlPlay = urlParams.get("play") === "1";
+if (urlPlay) showStart(false);
+
 function applyStoredSettings(state) {
   if (settingsApplied) return;
   settingsApplied = true;
   const difficulty = store.get("polyfall_difficulty", null);
   if (difficulty !== null) post({ cmd: "difficulty", value: difficulty });
-  const assist = store.get("polyfall_assist", null);
-  if (assist) post({ cmd: "assist", enabled: !!assist.enabled, level: assist.level || 1 });
+  if (urlAssist !== null) {
+    const level = Math.max(0, Math.min(3, Number(urlAssist) || 0));
+    post({ cmd: "assist", enabled: level > 0, level: Math.max(1, level) });
+  } else {
+    const assist = store.get("polyfall_assist", null);
+    if (assist) post({ cmd: "assist", enabled: !!assist.enabled, level: assist.level || 1 });
+  }
   const speed = store.get("polyfall_speed", null);
   if (speed) post({ cmd: "speed_mode", value: speed });
+  if (urlPlay) {
+    showStart(false);
+    post({ cmd: "pause", value: false });
+  }
 }
 
 // -------------------------------------------------------------- polling
@@ -613,6 +628,7 @@ document.getElementById("btn-title2").addEventListener("click", () => {
 });
 
 buildThemeButtons();
+if (urlTheme && T.THEMES[urlTheme]) applyTheme(urlTheme);
 updateDifficultyLabel(0);
 setInterval(poll, 33);
 poll();
